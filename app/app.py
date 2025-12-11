@@ -1,6 +1,7 @@
-### NOTES ###
+### NOTES START ###
 # Our API is designed to handle data; accepting requests from the frontend or client and returning responses
 # It automatically validates all data going into and coming out of the function.
+### NOTES END ###
 
 import os
 import shutil
@@ -13,7 +14,7 @@ from imagekitio.models.UploadFileRequestOptions import UploadFileRequestOptions
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import Post, create_db_and_tables, get_async_session, User
+from app.db import Post, User, create_db_and_tables, get_async_session
 from app.images import imagekit
 from app.schema import PostCreate, PostResponse, UserCreate, UserRead, UserUpdate
 from app.users import auth_backend, current_active_user, fastapi_users
@@ -73,11 +74,12 @@ async def upload_file(
 
         if upload_result.response_metadata.http_status_code == 200:
             post = Post(
-                user_id = user.id,
+                user_id=user.id,
                 caption=caption,
                 url=upload_result.url,
                 file_type="video"
-                if file.content_type.startswith("video/") else "image",
+                if file.content_type.startswith("video/")
+                else "image",
                 file_name=upload_result.name,
             )
             session.add(post)
@@ -93,14 +95,17 @@ async def upload_file(
 
 
 @app.get("/feed")
-async def get_feed(session: AsyncSession = Depends(get_async_session), user: User = Depends(current_active_user)):
+async def get_feed(
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+):
     result = await session.execute(select(Post).order_by(Post.created_at.desc()))
     posts = [row[0] for row in result.all()]
 
     result = await session.execute(select(User))
     users = [row[0] for row in result.all()]
     user_dict = {u.id: u.email for u in users}
-    
+
     posts_data = []
     for post in posts:
         posts_data.append(
@@ -113,7 +118,7 @@ async def get_feed(session: AsyncSession = Depends(get_async_session), user: Use
                 "file_name": post.file_name,
                 "created_at": post.created_at.isoformat(),
                 "is_owner": post.user_id == user.id,
-                "email": user_dict.get(post.user_id, "Unknown")
+                "email": user_dict.get(post.user_id, "Unknown"),
             }
         )
 
@@ -141,8 +146,13 @@ async def get_feed(session: AsyncSession = Depends(get_async_session), user: Use
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.delete("/posts/{post_id}")
-async def delete_post(post_id: str, session: AsyncSession = Depends(get_async_session), user: User = Depends(current_active_user)):
+async def delete_post(
+    post_id: str,
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+):
     try:
         post_uuid = uuid.UUID(post_id)
 
@@ -153,7 +163,9 @@ async def delete_post(post_id: str, session: AsyncSession = Depends(get_async_se
             raise HTTPException(status_code=404, detail="Post not found")
 
         if post.user_id != user.id:
-            raise HTTPException(status_code=403, detail="You don't have permission to delete this post")
+            raise HTTPException(
+                status_code=403, detail="You don't have permission to delete this post"
+            )
 
         session.delete(post)
         await session.commit()
